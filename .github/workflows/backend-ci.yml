@@ -1,0 +1,55 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'backend/**'
+
+jobs:
+  test-and-package:
+    name: Test & Package Lambda Functions
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        function: [generate_questions, evaluate_answers, save_results, get_history]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/${{ matrix.function }}/requirements.txt
+          pip install pytest pytest-mock moto boto3
+
+      - name: Run unit tests
+        run: pytest backend/tests/test_${{ matrix.function }}.py -v
+
+      - name: Package Lambda zip
+        run: |
+          mkdir -p build/${{ matrix.function }}
+          cp -r backend/${{ matrix.function }}/*.py build/${{ matrix.function }}/
+          cp -r backend/common/*.py build/${{ matrix.function }}/
+          pip install -r backend/${{ matrix.function }}/requirements.txt -t build/${{ matrix.function }}/ --no-user
+          cd build/${{ matrix.function }} && zip -r ../../${{ matrix.function }}.zip . -x "*.pyc" -x "__pycache__/*"
+
+      - name: Upload Lambda package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lambda-${{ matrix.function }}
+          path: ${{ matrix.function }}.zip
+          retention-days: 7

@@ -1,12 +1,24 @@
 import json
 import os
 import sys
+import importlib.util
 from unittest.mock import patch
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "evaluate_answers"))
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "common"))
 
-import handler
+handler_path = os.path.join(
+    os.path.dirname(__file__),
+    "..",
+    "evaluate_answers",
+    "handler.py"
+)
+
+spec = importlib.util.spec_from_file_location(
+    "evaluate_answers_handler",
+    handler_path
+)
+handler = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(handler)
 
 
 def make_event(qa_pairs, user_id="user-123"):
@@ -22,7 +34,7 @@ def make_event(qa_pairs, user_id="user-123"):
     }
 
 
-@patch("handler.bedrock_client.invoke_model")
+@patch.object(handler.bedrock_client, "invoke_model")
 def test_evaluate_answers_success(mock_invoke):
     mock_invoke.return_value = json.dumps({
         "score": 7,
@@ -31,7 +43,10 @@ def test_evaluate_answers_success(mock_invoke):
         "improvements": "Mention rollback strategies."
     })
 
-    event = make_event([{"question": "What is CI/CD?", "answer": "It automates deployments."}])
+    event = make_event(
+        [{"question": "What is CI/CD?", "answer": "It automates deployments."}]
+    )
+
     response = handler.lambda_handler(event, None)
     body = json.loads(response["body"])
 
@@ -41,7 +56,10 @@ def test_evaluate_answers_success(mock_invoke):
 
 
 def test_evaluate_answers_empty_answer_skips_bedrock():
-    event = make_event([{"question": "What is Docker?", "answer": ""}])
+    event = make_event(
+        [{"question": "What is Docker?", "answer": ""}]
+    )
+
     response = handler.lambda_handler(event, None)
     body = json.loads(response["body"])
 
@@ -52,4 +70,5 @@ def test_evaluate_answers_empty_answer_skips_bedrock():
 def test_evaluate_answers_missing_qa_pairs():
     event = make_event([])
     response = handler.lambda_handler(event, None)
+
     assert response["statusCode"] == 400

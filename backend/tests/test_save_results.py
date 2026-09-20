@@ -1,12 +1,24 @@
 import json
 import os
 import sys
+import importlib.util
 from unittest.mock import patch
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "save_results"))
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "common"))
 
-import handler
+handler_path = os.path.join(
+    os.path.dirname(__file__),
+    "..",
+    "save_results",
+    "handler.py"
+)
+
+spec = importlib.util.spec_from_file_location(
+    "save_results_handler",
+    handler_path
+)
+handler = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(handler)
 
 
 def make_event(user_id="user-123"):
@@ -26,10 +38,16 @@ def make_event(user_id="user-123"):
     }
 
 
-@patch("handler.save_interview_result")
-@patch("handler.ensure_user_exists")
-def test_save_results_success(mock_ensure_user, mock_save):
-    mock_save.return_value = {"interview_id": "abc-123", "created_at": "2026-09-15T00:00:00Z"}
+@patch.object(handler, "save_interview_result")
+@patch.object(handler, "ensure_user_exists")
+def test_save_results_success(
+    mock_ensure_user,
+    mock_save
+):
+    mock_save.return_value = {
+        "interview_id": "abc-123",
+        "created_at": "2026-09-15T00:00:00Z"
+    }
 
     response = handler.lambda_handler(make_event(), None)
     body = json.loads(response["body"])
@@ -41,7 +59,10 @@ def test_save_results_success(mock_ensure_user, mock_save):
 
 def test_save_results_missing_fields():
     event = make_event()
-    event["body"] = json.dumps({"domain": "Kubernetes"})  # missing required fields
+    event["body"] = json.dumps({
+        "domain": "Kubernetes"
+    })
 
     response = handler.lambda_handler(event, None)
+
     assert response["statusCode"] == 400

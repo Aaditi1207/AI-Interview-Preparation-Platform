@@ -1,28 +1,28 @@
 locals {
   functions = {
     generate_questions = {
-      handler     = "handler.lambda_handler"
-      source_path = "${path.root}/../backend/generate_questions"
+      handler = "generate_questions.handler.lambda_handler"
     }
+
     evaluate_answers = {
-      handler     = "handler.lambda_handler"
-      source_path = "${path.root}/../backend/evaluate_answers"
+      handler = "evaluate_answers.handler.lambda_handler"
     }
+
     save_results = {
-      handler     = "handler.lambda_handler"
-      source_path = "${path.root}/../backend/save_results"
+      handler = "save_results.handler.lambda_handler"
     }
+
     get_history = {
-      handler     = "handler.lambda_handler"
-      source_path = "${path.root}/../backend/get_history"
+      handler = "get_history.handler.lambda_handler"
     }
   }
 }
-
 data "archive_file" "this" {
   for_each    = local.functions
   type        = "zip"
-  source_dir  = each.value.source_path
+
+  source_dir  = "${path.root}/../backend"
+
   output_path = "${path.module}/build/${each.key}.zip"
 }
 
